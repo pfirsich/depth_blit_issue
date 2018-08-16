@@ -20,6 +20,5 @@ include_directories(dependencies/glad/include)
 add_subdirectory(dependencies/glfw)
 include_directories(dependencies/glfw/include)
 
-add_compile_definitions(NOMINMAX)
 add_executable(depth_blit_issue main.cpp)
 target_link_libraries(depth_blit_issue glfw glad)
