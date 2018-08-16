@@ -8,9 +8,8 @@
 
 #define ENABLE_FRAMEBUFFER_SRGB
 //#define DISABLE_SRGB_BEFORE_DEPTH_BLIT
-
-// only relevant if DISABLE_SRGB_BEFORE_DEPTH_BLIT is not defined
-#define SEPARATE_COLOR_AND_DEPTH_BLIT
+//#define USE_SRGB_FBO
+//#define SEPARATE_COLOR_AND_DEPTH_BLIT
 
 const glm::ivec2 res = glm::ivec2(800, 600);
 GLFWwindow *window;
@@ -60,7 +59,7 @@ int main(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    if(!(window = glfwCreateWindow(res.x, res.y, "Hello, Triangle", NULL, NULL))) {
+    if(!(window = glfwCreateWindow(res.x, res.y, "Depth Blit Issues", NULL, NULL))) {
         glfwTerminate();
         std::cout << "Failed to create window" << std::endl;
         return 1;
@@ -97,7 +96,12 @@ int main(int argc, char** argv) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    GLuint colorTex = texture(GL_RGBA, GL_RGBA);
+    #ifdef USE_SRGB_FBO
+        GLenum colorTexInternalFormat = GL_SRGB8_ALPHA8;
+    #else 
+        GLenum colorTexInternalFormat = GL_RGBA8;
+    #endif
+    GLuint colorTex = texture(colorTexInternalFormat, GL_RGBA);
     GLuint depthTex = texture(GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT);
 
     GLuint fbo;
@@ -126,10 +130,17 @@ int main(int argc, char** argv) {
 
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         #ifdef DISABLE_SRGB_BEFORE_DEPTH_BLIT
-            glBlitFramebuffer(0, 0, res.x, res.y, 0, 0, res.x, res.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-            glDisable(GL_FRAMEBUFFER_SRGB);
-            glBlitFramebuffer(0, 0, res.x, res.y, 0, 0, res.x, res.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-            glEnable(GL_FRAMEBUFFER_SRGB);
+            GLboolean enabled = glIsEnabled(GL_FRAMEBUFFER_SRGB);
+            #ifdef SEPARATE_COLOR_AND_DEPTH_BLIT
+                glBlitFramebuffer(0, 0, res.x, res.y, 0, 0, res.x, res.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                glDisable(GL_FRAMEBUFFER_SRGB);
+                glBlitFramebuffer(0, 0, res.x, res.y, 0, 0, res.x, res.y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                if(enabled) glEnable(GL_FRAMEBUFFER_SRGB);
+            #else
+                glDisable(GL_FRAMEBUFFER_SRGB);
+                glBlitFramebuffer(0, 0, res.x, res.y, 0, 0, res.x, res.y, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+                if(enabled) glEnable(GL_FRAMEBUFFER_SRGB);
+            #endif
         #else
             #ifdef SEPARATE_COLOR_AND_DEPTH_BLIT
                 glBlitFramebuffer(0, 0, res.x, res.y, 0, 0, res.x, res.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
